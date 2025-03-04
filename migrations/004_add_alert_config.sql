@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS alert_config (
+    id INTEGER PRIMARY KEY,
+    response_time_warning INTEGER NOT NULL DEFAULT 1000,
+    response_time_critical INTEGER NOT NULL DEFAULT 2000,
+    ssl_expiry_warning INTEGER NOT NULL DEFAULT 30,
+    ssl_expiry_critical INTEGER NOT NULL DEFAULT 7,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

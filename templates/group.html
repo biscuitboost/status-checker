@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>URL Monitor - Group View</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <nav class="mb-8">
+            <a href="/" class="text-blue-600 hover:text-blue-800">← Back to Dashboard</a>
+        </nav>
+        
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold mb-2" id="groupTitle">Loading...</h1>
+            <div class="text-gray-600" id="groupStats">
+                Loading statistics...
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 gap-6 mb-8">
+            <!-- Response Time Chart -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Response Time (Last Hour)</h2>
+                <div style="height: 400px; position: relative;">
+                    <canvas id="responseTimeChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow">
+            <div class="p-6">
+                <h2 class="text-xl font-semibold mb-4">URLs</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full table-auto">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Response Time</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SSL Expiry</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Check</th>
+                            </tr>
+                        </thead>
+                        <tbody id="urlTableBody">
+                            <tr>
+                                <td colspan="5" class="px-6 py-4 text-center">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Parse URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const application = urlParams.get('app') || window.location.pathname.split('/')[2];
+        const region = urlParams.get('region') || window.location.pathname.split('/')[3];
+        const environment = urlParams.get('env') || window.location.pathname.split('/')[4];
+        
+        // Initialize chart
+        let responseTimeChart = null;
+
+        function updateGroupTitle() {
+            const title = `${application} - ${region} - ${environment}`;
+            document.getElementById('groupTitle').textContent = title;
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+
+        function formatDuration(ms) {
+            if (!ms) return 'N/A';
+            return `${ms.toFixed(2)}ms`;
+        }
+
+        function getStatusClass(statusCode) {
+            if (!statusCode || statusCode === 'N/A') return 'bg-red-100 text-red-800';
+            if (statusCode >= 200 && statusCode < 300) return 'bg-green-100 text-green-800';
+            if (statusCode >= 300 && statusCode < 400) return 'bg-blue-100 text-blue-800';
+            if (statusCode >= 400 && statusCode < 500) return 'bg-yellow-100 text-yellow-800';
+            return 'bg-red-100 text-red-800';
+        }
+
+        function getStatusText(statusCode) {
+            if (!statusCode || statusCode === 'N/A') return 'N/A';
+            if (statusCode >= 200 && statusCode < 300) return statusCode.toString();
+            if (statusCode >= 300 && statusCode < 400) return statusCode.toString();
+            if (statusCode >= 400 && statusCode < 500) return statusCode.toString();
+            return statusCode.toString();
+        }
+
+        function getSSLExpiryInfo(expiryDate) {
+            if (!expiryDate) return { text: 'N/A', class: 'bg-gray-100 text-gray-800' };
+            
+            const expiry = new Date(expiryDate);
+            const now = new Date();
+            const daysUntilExpiry = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+            
+            if (daysUntilExpiry < 0) {
+                return { text: 'Expired', class: 'bg-red-100 text-red-800' };
+            } else if (daysUntilExpiry < 30) {
+                return { text: `Expires in ${daysUntilExpiry} days`, class: 'bg-yellow-100 text-yellow-800' };
+            } else {
+                return { text: formatDate(expiryDate), class: 'bg-green-100 text-green-800' };
+            }
+        }
+
+        async function updateStats() {
+            const response = await fetch(`/api/stats/${application}/${region}/${environment}`);
+            const stats = await response.json();
+            
+            const statsHtml = `
+                <div class="grid grid-cols-4 gap-4">
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <h3 class="text-sm font-medium text-gray-500 uppercase">URLs</h3>
+                        <p class="mt-1">
+                            <span class="text-2xl font-semibold">${stats.urls.active}</span>
+                            <span class="text-gray-500"> / ${stats.urls.total}</span>
+                        </p>
+                        <p class="text-sm text-gray-500">Active / Total</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4 cursor-pointer hover:bg-gray-50" onclick="showErrorModal()">
+                        <h3 class="text-sm font-medium text-gray-500 uppercase">Errors (24h)</h3>
+                        <p class="mt-1">
+                            <span class="text-2xl font-semibold">${stats.errors.last_24h}</span>
+                        </p>
+                        <p class="text-sm text-gray-500">Total Errors</p>
+                        <p class="text-xs text-blue-600 mt-2">Click to view details →</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <h3 class="text-sm font-medium text-gray-500 uppercase">Response Time</h3>
+                        <p class="mt-1">
+                            <span class="text-2xl font-semibold">${formatDuration(stats.performance.avg_response_time)}</span>
+                        </p>
+                        <p class="text-sm text-gray-500">
+                            Min: ${formatDuration(stats.performance.min_response_time)} / 
+                            Max: ${formatDuration(stats.performance.max_response_time)}
+                        </p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <h3 class="text-sm font-medium text-gray-500 uppercase">SSL Certificates</h3>
+                        <p class="mt-1">
+                            <span class="text-2xl font-semibold">${stats.ssl.valid}</span>
+                            <span class="text-gray-500"> / ${stats.ssl.total}</span>
+                        </p>
+                        <p class="text-sm text-gray-500">Valid / Total</p>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('groupStats').innerHTML = statsHtml;
+        }
+
+        async function showErrorModal() {
+            const response = await fetch(`/api/errors/${application}/${region}/${environment}`);
+            const errors = await response.json();
+            
+            const modalHtml = `
+                <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full" id="errorModal">
+                    <div class="relative top-20 mx-auto p-5 border w-4/5 shadow-lg rounded-md bg-white">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-medium">Error Log (Last 24 Hours)</h3>
+                            <button onclick="closeErrorModal()" class="text-gray-500 hover:text-gray-700">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full table-auto">
+                                <thead>
+                                    <tr class="bg-gray-50">
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Error</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Response Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${errors.length === 0 ? 
+                                        '<tr><td colspan="5" class="px-6 py-4 text-center">No errors in the last 24 hours</td></tr>' :
+                                        errors.map(error => `
+                                            <tr class="hover:bg-gray-50">
+                                                <td class="px-6 py-4">${formatDate(error.timestamp)}</td>
+                                                <td class="px-6 py-4">${error.url}</td>
+                                                <td class="px-6 py-4">
+                                                    <span class="px-2 py-1 rounded bg-red-100 text-red-800">
+                                                        ${error.error}
+                                                        ${error.error_count > 1 ? 
+                                                            `<span class="ml-1 font-semibold">(${error.error_count}x)</span>` : 
+                                                            ''}
+                                                    </span>
+                                                </td>
+                                                <td class="px-6 py-4">${error.status_code || 'N/A'}</td>
+                                                <td class="px-6 py-4">${formatDuration(error.response_time)}</td>
+                                            </tr>
+                                        `).join('')
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if present
+            const existingModal = document.getElementById('errorModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add new modal
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+
+        function closeErrorModal() {
+            const modal = document.getElementById('errorModal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('errorModal');
+            if (modal && event.target === modal) {
+                closeErrorModal();
+            }
+        });
+
+        async function updateUrls() {
+            const response = await fetch(`/api/urls/${application}/${region}/${environment}`);
+            const urls = await response.json();
+            
+            const tableBody = document.getElementById('urlTableBody');
+            tableBody.innerHTML = '';
+            
+            urls.forEach(url => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                
+                const statusClass = getStatusClass(url.status_code);
+                
+                const sslExpiry = getSSLExpiryInfo(url.ssl_expiry);
+                
+                row.innerHTML = `
+                    <td class="px-6 py-4">${url.url}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 rounded ${statusClass}">
+                            ${getStatusText(url.status_code)}
+                        </span>
+                        ${url.error && url.status_code !== 200 ? 
+                            `<div class="mt-1 text-xs text-red-600">${url.error} ${url.error_count > 1 ? `<span class="font-semibold">(${url.error_count}x)</span>` : ''}</div>` : 
+                            ''}
+                    </td>
+                    <td class="px-6 py-4">${formatDuration(url.response_time)}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 rounded ${sslExpiry.class}">
+                            ${sslExpiry.text}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">${formatDate(url.last_check)}</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+
+            // Update response time chart
+            await updateResponseTimeChart();
+        }
+
+        async function updateResponseTimeChart() {
+            const response = await fetch(`/api/response-time-history/${application}/${region}/${environment}`);
+            const historyData = await response.json();
+            
+            // Process data for Chart.js
+            const datasets = [];
+            const labels = [];
+            const colors = [
+                'rgb(59, 130, 246)', // blue
+                'rgb(16, 185, 129)', // green
+                'rgb(239, 68, 68)',  // red
+                'rgb(245, 158, 11)', // yellow
+                'rgb(139, 92, 246)',  // purple
+                'rgb(236, 72, 153)', // pink
+                'rgb(6, 182, 212)',  // cyan
+                'rgb(249, 115, 22)', // orange
+            ];
+            
+            // Create time labels (every 5 minutes for the last hour)
+            const now = new Date();
+            // Create labels from oldest to newest (left to right)
+            for (let i = 60; i >= 0; i -= 5) {
+                const time = new Date(now - i*60*1000);
+                labels.push(time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+            }
+            
+            // Process each URL's data
+            let colorIndex = 0;
+            for (const [url, data] of Object.entries(historyData)) {
+                // Extract hostname for label
+                const displayName = new URL(url).hostname || url;
+                
+                // Prepare data points aligned with our labels
+                const dataPoints = Array(labels.length).fill(null);
+                
+                // Fill in actual data points
+                data.forEach(point => {
+                    const timestamp = new Date(point.timestamp);
+                    // Find closest label time
+                    const minutesFromNow = Math.round((now - timestamp) / (60 * 1000));
+                    const labelIndex = Math.floor(minutesFromNow / 5);
+                    if (labelIndex >= 0 && labelIndex < labels.length) {
+                        // Place data points at the correct position in the array
+                        // For left-to-right display, use the labelIndex directly
+                        dataPoints[labelIndex] = point.response_time;
+                    }
+                });
+                
+                datasets.push({
+                    label: displayName,
+                    data: dataPoints,
+                    borderColor: colors[colorIndex % colors.length],
+                    backgroundColor: colors[colorIndex % colors.length].replace('rgb', 'rgba').replace(')', ', 0.1)'),
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: false,
+                    pointRadius: 3
+                });
+                
+                colorIndex++;
+            }
+            
+            if (responseTimeChart) {
+                responseTimeChart.destroy();
+            }
+            
+            const ctx = document.getElementById('responseTimeChart').getContext('2d');
+            responseTimeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    layout: {
+                        padding: {
+                            left: 10,
+                            right: 30,
+                            top: 20,
+                            bottom: 10
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Response Time (ms)'
+                            },
+                            grid: {
+                                drawBorder: false
+                            },
+                            ticks: {
+                                padding: 10
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            },
+                            grid: {
+                                drawBorder: false
+                            },
+                            ticks: {
+                                padding: 10
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 300
+                    },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    elements: {
+                        line: {
+                            tension: 0.3
+                        },
+                        point: {
+                            radius: 2,
+                            hoverRadius: 5
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                boxWidth: 12,
+                                padding: 15
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += formatDuration(context.parsed.y);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize
+        updateGroupTitle();
+        updateStats();
+        updateUrls();
+        
+        // Update every 30 seconds
+        setInterval(() => {
+            updateStats();
+            updateUrls();
+        }, 30000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+{
+  "https://example.com": [
+    {
+      "timestamp": "2025-02-18T13:20:17.248070",
+      "status_code": 200,
+      "response_time": 0.590557336807251,
+      "error": null
+    },
+    {
+      "timestamp": "2025-02-18T13:21:29.406272",
+      "status_code": 200,
+      "response_time": 0.625450849533081,
+      "error": null
+    }
+  ],
+  "https://api.example.com": [
+    {
+      "timestamp": "2025-02-18T13:20:18.371741",
+      "status_code": null,
+      "response_time": null,
+      "error": "HTTPSConnectionPool(host='api.example.com', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x7f33cc082950>: Failed to resolve 'api.example.com' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "timestamp": "2025-02-18T13:21:30.447693",
+      "status_code": null,
+      "response_time": null,
+      "error": "HTTPSConnectionPool(host='api.example.com', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x7f6631c76990>: Failed to resolve 'api.example.com' ([Errno -2] Name or service not known)\"))"
+    }
+  ],
+  "https://google.com": [
+    {
+      "timestamp": "2025-02-18T13:20:18.478695",
+      "status_code": 200,
+      "response_time": 0.30072593688964844,
+      "error": null
+    },
+    {
+      "timestamp": "2025-02-18T13:21:30.449661",
+      "status_code": 200,
+      "response_time": 0.247481107711792,
+      "error": null
+    }
+  ]
+}

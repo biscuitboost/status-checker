@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>URL Monitor Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8 flex justify-between items-center">
+            <h1 class="text-3xl font-bold">URL Monitor Admin</h1>
+            <a href="/" class="text-blue-600 hover:text-blue-800">Back to Dashboard</a>
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="mb-4 p-4 rounded-lg {% if category == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- URL Management -->
+        <div class="bg-white rounded-lg shadow mb-8">
+            <div class="p-6">
+                <h2 class="text-xl font-semibold mb-4">Add New URL</h2>
+                <form action="/admin/urls/add" method="POST" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">URL</label>
+                            <input type="url" name="url" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Application</label>
+                            <input type="text" name="application" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Region</label>
+                            <select name="region" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="EU">EU</option>
+                                <option value="US">US</option>
+                                <option value="APAC">APAC</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Environment</label>
+                            <select name="environment" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="prod">Production</option>
+                                <option value="staging">Staging</option>
+                                <option value="dev">Development</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" 
+                            class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            Add URL
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Existing URLs -->
+        <div class="bg-white rounded-lg shadow mb-8">
+            <div class="p-6">
+                <h2 class="text-xl font-semibold mb-4">Manage URLs</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead>
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Application</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Region</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Environment</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for url in urls %}
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ url.url }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ url.application }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ url.region }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ url.environment }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 py-1 text-xs rounded-full {% if url.active %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                        {{ 'Active' if url.active else 'Inactive' }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                    <form action="/admin/urls/toggle" method="POST" class="inline">
+                                        <input type="hidden" name="url" value="{{ url.url }}">
+                                        <button type="submit" class="text-blue-600 hover:text-blue-900">
+                                            {{ 'Deactivate' if url.active else 'Activate' }}
+                                        </button>
+                                    </form>
+                                    <span class="text-gray-300 mx-2">|</span>
+                                    <form action="/admin/urls/delete" method="POST" class="inline">
+                                        <input type="hidden" name="url" value="{{ url.url }}">
+                                        <button type="submit" class="text-red-600 hover:text-red-900"
+                                            onclick="return confirm('Are you sure you want to delete this URL?')">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Configuration -->
+        <div class="bg-white rounded-lg shadow mb-8">
+            <div class="p-6">
+                <h2 class="text-xl font-semibold mb-4">Alert Configuration</h2>
+                <form action="/admin/alerts/update" method="POST" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">Response Time Thresholds</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Warning Threshold (ms)</label>
+                                    <input type="number" name="response_time_warning" value="{{ alert_config.response_time_warning }}"
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Critical Threshold (ms)</label>
+                                    <input type="number" name="response_time_critical" value="{{ alert_config.response_time_critical }}"
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">SSL Certificate Alerts</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Warning Days Before Expiry</label>
+                                    <input type="number" name="ssl_expiry_warning" value="{{ alert_config.ssl_expiry_warning }}"
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Critical Days Before Expiry</label>
+                                    <input type="number" name="ssl_expiry_critical" value="{{ alert_config.ssl_expiry_critical }}"
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" 
+                            class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            Save Alert Configuration
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Custom Alert Thresholds -->
+        <div class="bg-white rounded-lg shadow mb-8">
+            <div class="p-6">
+                <h2 class="text-xl font-semibold mb-4">Custom Alert Thresholds</h2>
+                <form action="/admin/thresholds/add" method="POST" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">URL (Optional)</label>
+                            <input type="url" name="url" 
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                placeholder="Leave blank for group-level">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Application</label>
+                            <input type="text" name="application" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Region</label>
+                            <select name="region" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="EU">EU</option>
+                                <option value="US">US</option>
+                                <option value="APAC">APAC</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Environment</label>
+                            <select name="environment" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="prod">Production</option>
+                                <option value="staging">Staging</option>
+                                <option value="dev">Development</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Response Time Warning (ms)</label>
+                            <input type="number" name="response_time_warning" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Response Time Critical (ms)</label>
+                            <input type="number" name="response_time_critical" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">SSL Warning (days)</label>
+                            <input type="number" name="ssl_expiry_warning" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">SSL Critical (days)</label>
+                            <input type="number" name="ssl_expiry_critical" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" 
+                            class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            Add Custom Thresholds
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Maintenance Windows -->
+        <div class="bg-white rounded-lg shadow mb-8">
+            <div class="p-6">
+                <h2 class="text-xl font-semibold mb-4">Maintenance Windows</h2>
+                <form action="/admin/maintenance/add" method="POST" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">URL (Optional)</label>
+                            <input type="url" name="url"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                placeholder="Leave blank for group-level">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Application</label>
+                            <input type="text" name="application" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Region</label>
+                            <select name="region" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="EU">EU</option>
+                                <option value="US">US</option>
+                                <option value="APAC">APAC</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Environment</label>
+                            <select name="environment" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="prod">Production</option>
+                                <option value="staging">Staging</option>
+                                <option value="dev">Development</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Start Time</label>
+                            <input type="datetime-local" name="start_time" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">End Time</label>
+                            <input type="datetime-local" name="end_time" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Description</label>
+                            <input type="text" name="description" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                placeholder="e.g., Scheduled database maintenance">
+                        </div>
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" 
+                            class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            Add Maintenance Window
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Alert Contacts -->
+        <div class="bg-white rounded-lg shadow mb-8">
+            <div class="p-6">
+                <h2 class="text-xl font-semibold mb-4">Alert Contacts</h2>
+                
+                <!-- Add Contact Form -->
+                <form action="/admin/contacts/add" method="POST" class="mb-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Name</label>
+                            <input type="text" name="name" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Email</label>
+                            <input type="email" name="email" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <div class="mt-4 flex justify-end">
+                        <button type="submit"
+                            class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            Add Contact
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Contacts List -->
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead>
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Groups</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for contact in contacts %}
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ contact.name }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ contact.email }}</td>
+                                <td class="px-6 py-4">
+                                    <button type="button" onclick="showGroupModal({{ contact.id }})"
+                                        class="text-blue-600 hover:text-blue-900">
+                                        Manage Groups
+                                    </button>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <form action="/admin/contacts/delete" method="POST" class="inline">
+                                        <input type="hidden" name="contact_id" value="{{ contact.id }}">
+                                        <button type="submit" class="text-red-600 hover:text-red-900"
+                                            onclick="return confirm('Are you sure you want to delete this contact?')">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Group Assignment Modal -->
+        <div id="groupModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Assign Groups</h3>
+                    <form id="groupAssignForm" action="/admin/contacts/assign-groups" method="POST">
+                        <input type="hidden" name="contact_id" id="modalContactId">
+                        
+                        <div class="space-y-4 max-h-96 overflow-y-auto">
+                            {% for group in groups %}
+                            <div class="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                <div>
+                                    <p class="font-medium">{{ group.application }}</p>
+                                    <p class="text-sm text-gray-600">{{ group.region }} - {{ group.environment }}</p>
+                                </div>
+                                <div class="space-x-2">
+                                    <label class="inline-flex items-center">
+                                        <input type="checkbox" name="group_{{ group.id }}_warning" class="form-checkbox text-blue-600">
+                                        <span class="ml-2 text-sm">Warning</span>
+                                    </label>
+                                    <label class="inline-flex items-center">
+                                        <input type="checkbox" name="group_{{ group.id }}_critical" class="form-checkbox text-blue-600">
+                                        <span class="ml-2 text-sm">Critical</span>
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="flex justify-end space-x-4 mt-4">
+                            <button type="button" onclick="hideGroupModal()"
+                                class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">
+                                Cancel
+                            </button>
+                            <button type="submit"
+                                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                                Save
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            function showGroupModal(contactId) {
+                document.getElementById('modalContactId').value = contactId;
+                document.getElementById('groupModal').classList.remove('hidden');
+                
+                // Load existing assignments
+                fetch(`/admin/contacts/${contactId}/groups`)
+                    .then(response => response.json())
+                    .then(assignments => {
+                        assignments.forEach(assignment => {
+                            const warningCheckbox = document.querySelector(`input[name="group_${assignment.group_id}_warning"]`);
+                            const criticalCheckbox = document.querySelector(`input[name="group_${assignment.group_id}_critical"]`);
+                            if (warningCheckbox) warningCheckbox.checked = assignment.notify_on_warning;
+                            if (criticalCheckbox) criticalCheckbox.checked = assignment.notify_on_critical;
+                        });
+                    });
+            }
+
+            function hideGroupModal() {
+                document.getElementById('groupModal').classList.add('hidden');
+            }
+
+            // Close modal when clicking outside
+            document.getElementById('groupModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    hideGroupModal();
+                }
+            });
+        </script>
+    </div>
+</body>
+</html>

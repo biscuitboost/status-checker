@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SLA Report - {{ application }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <nav class="mb-8">
+            <a href="/" class="text-blue-600 hover:text-blue-800">← Back to Dashboard</a>
+        </nav>
+        
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold mb-2">SLA Report: {{ application }}</h1>
+            <div class="text-gray-600">
+                {{ start_date.strftime('%Y-%m-%d %H:%M:%S') }} to {{ end_date.strftime('%Y-%m-%d %H:%M:%S') }}
+            </div>
+        </header>
+
+        <!-- Period Selection -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 class="text-lg font-semibold mb-4">Select Period</h2>
+            <div class="flex space-x-4">
+                <a href="?period=daily" 
+                   class="px-4 py-2 rounded {% if period == 'daily' %}bg-blue-600 text-white{% else %}bg-gray-200 text-gray-700{% endif %} hover:bg-blue-700 hover:text-white">
+                    Daily
+                </a>
+                <a href="?period=weekly"
+                   class="px-4 py-2 rounded {% if period == 'weekly' %}bg-blue-600 text-white{% else %}bg-gray-200 text-gray-700{% endif %} hover:bg-blue-700 hover:text-white">
+                    Weekly
+                </a>
+                <a href="?period=monthly"
+                   class="px-4 py-2 rounded {% if period == 'monthly' %}bg-blue-600 text-white{% else %}bg-gray-200 text-gray-700{% endif %} hover:bg-blue-700 hover:text-white">
+                    Monthly
+                </a>
+                <a href="?period=quarterly"
+                   class="px-4 py-2 rounded {% if period == 'quarterly' %}bg-blue-600 text-white{% else %}bg-gray-200 text-gray-700{% endif %} hover:bg-blue-700 hover:text-white">
+                    Quarterly
+                </a>
+                <a href="?period=yearly"
+                   class="px-4 py-2 rounded {% if period == 'yearly' %}bg-blue-600 text-white{% else %}bg-gray-200 text-gray-700{% endif %} hover:bg-blue-700 hover:text-white">
+                    Yearly
+                </a>
+            </div>
+        </div>
+
+        <!-- SLA Summary -->
+        <div class="bg-white rounded-lg shadow mb-8">
+            <div class="p-6">
+                <h2 class="text-xl font-semibold mb-4">SLA Summary</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full table-auto">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Environment</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Region</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uptime</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Checks</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Failed Checks</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Maintenance</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for data in sla_data %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <a href="{{ data.url }}" target="_blank" class="text-blue-600 hover:text-blue-900">
+                                        {{ data.url }}
+                                    </a>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ data.environment }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ data.region }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                                            <div class="bg-blue-600 rounded-full h-2" style="width: {{ data.sla_percentage }}%"></div>
+                                        </div>
+                                        <span class="text-sm font-medium">{{ "%.2f"|format(data.sla_percentage) }}%</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ data.total_checks }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 py-1 text-sm rounded {% if data.failed_checks > 0 %}bg-red-100 text-red-800{% else %}bg-green-100 text-green-800{% endif %}">
+                                        {{ data.failed_checks }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    {{ "%.1f"|format(data.maintenance_minutes/60) }} hours
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLA Chart -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="p-6">
+                <h2 class="text-xl font-semibold mb-4">SLA Trend</h2>
+                <canvas id="slaChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Prepare data for the chart
+        const urls = {{ sla_data|map(attribute='url')|list|tojson }};
+        const slaValues = {{ sla_data|map(attribute='sla_percentage')|list|tojson }};
+        
+        // Create the chart
+        const ctx = document.getElementById('slaChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: urls,
+                datasets: [{
+                    label: 'SLA Percentage',
+                    data: slaValues,
+                    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                    borderColor: 'rgb(59, 130, 246)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Uptime Percentage'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'URLs'
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'SLA by URL'
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
